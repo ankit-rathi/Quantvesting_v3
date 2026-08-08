@@ -204,3 +204,14 @@ Expected files under `data/`:
 4. Formalise the decision engine.
 5. Expose the engine through an API.
 6. Build the Web UI on top of the same public interface.
+
+## Notebook presentation views
+
+The notebooks keep the engine output intact but use presentation-only helpers for the interactive views:
+
+- `PROSPECT_DISPLAY_COLUMNS` — requested prospect column order
+- `PORTFOLIO_DISPLAY_COLUMNS` — requested portfolio column order
+- `qv.display_run_summary(portfolio_summary)` — compact Deployed / Current / CAGR-XIRR summary
+- `qv.display_portfolio_category_chart(df_portfolio)` — current-value category donut chart
+
+These helpers live in `reporting.py`, so the investment engine remains independent of Jupyter and the same structured outputs can later feed the Web UI/API.
