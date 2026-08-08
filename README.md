@@ -71,6 +71,40 @@ is intentionally not used to filter the engine's ranking universe.
 
 Changing category weights does not require changing Python code.
 
+## Portfolio membership and DM/SV handling
+
+`myPortfolioStocks.csv` remains holding-level data. The same Symbol can
+appear multiple times because a stock may be held in both DM and SV (and the
+model can support additional accounts later).
+
+Prospect analysis is security-level, so it now aggregates portfolio
+membership before joining it to the prospect universe:
+
+```text
+myPortfolioStocks.csv
+        |
+        +-- ABBOTINDIA / DM
+        +-- ABBOTINDIA / SV
+        |
+        v
+portfolio membership
+        |
+        +-- ABBOTINDIA / DM+SV
+        |
+        v
+Prospects
+```
+
+This prevents one-to-many joins from duplicating prospect rows. The original
+holding-level records are still retained for portfolio calculations, so DM/SV
+shares and average costs continue to be aggregated correctly. A validation
+check now fails early if the security-level prospects dataset contains
+duplicate Symbols.
+
+When `include_portfolio=False`, the engine uses the aggregated membership view
+to exclude all currently held stocks, regardless of whether they are held in
+DM, SV or both.
+
 ## Portfolio output
 
 `qv.portfolio(data)` returns:
