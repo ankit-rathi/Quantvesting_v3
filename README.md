@@ -352,3 +352,168 @@ layers should only supply inputs and present structured engine outputs.
 8. Build the Web UI on top of the same public interface.
 9. Add authentication, subscriptions and multi-user storage only after the
    engine is stable.
+
+
+## Phase A — operationalisation
+
+Phase A is implemented without changing the notebook-first workflow.
+
+### 1. Screener XLSX ingestion
+
+The notebook no longer needs to contain the XLSX-to-CSV transformation logic.
+The same logic is available through:
+
+```python
+from quantvesting import Quantvesting, load_config
+
+config = load_config("config/strategy.yaml")
+qv = Quantvesting(config)
+
+df_screener = qv.ingest_screener("market_data")
+```
+
+The ingestion:
+
+1. reads `myScreenerDB.xlsx`
+2. extracts Screener hyperlinks from `Name`
+3. derives `Symbol`
+4. merges with the existing `myScreenerDB.csv`
+5. recalculates LC/MC/SC using market-cap ordering
+6. writes the canonical `myScreenerDB.csv`
+
+The workbook is still the source; the CSV is the engine-ready snapshot.
+
+### 2. EOD snapshot persistence
+
+Portfolio analysis now accepts:
+
+```python
+portfolio, summary = qv.portfolio(
+    market_data,
+    portfolio_data=portfolio_data,
+    portfolio_id="ankit",
+    run_id="run_...",
+    eod=True,
+)
+```
+
+When `eod=True`, the engine persists the final summary to:
+
+```text
+portfolio_data/<portfolio_id>/myPortfolioDB.csv
+```
+
+The same day's snapshot is replaced when the EOD run is repeated. This
+prevents duplicate daily snapshots.
+
+Each new snapshot carries:
+
+- `portfolio_id`
+- `run_id`
+- `run_datetime`
+- `strategy_version`
+- the existing portfolio summary metrics
+
+Older `myPortfolioDB.csv` rows remain readable; the new metadata columns are
+added only to newly generated snapshots.
+
+### 3. Repository abstraction
+
+The engine now separates analysis from persistence:
+
+```text
+Quantvesting Engine
+       |
+       +--> MarketDataRepository
+       |       |
+       |       +--> FileMarketDataRepository   (now)
+       |       +--> PostgreSQL repository       (later)
+       |
+       +--> PortfolioRepository
+               |
+               +--> FilePortfolioRepository    (now)
+               +--> PostgreSQL repository       (later)
+```
+
+The current Jupyter/Colab implementation uses the file repositories. This is
+the deliberate Phase A boundary for the future PostgreSQL/Web API MVP.
+
+### 4. Portfolio/run awareness
+
+Portfolio data is identified by `portfolio_id`. Every engine execution can
+also be identified by a `run_id`.
+
+Example:
+
+```python
+RUN_ID = create_run_id()
+
+df_prospects = qv.prospects(
+    market_data,
+    portfolio_data=portfolio_data,
+    portfolio_id="ankit",
+    run_id=RUN_ID,
+)
+
+df_portfolio, summary = qv.portfolio(
+    market_data,
+    portfolio_data=portfolio_data,
+    portfolio_id="ankit",
+    run_id=RUN_ID,
+    eod=False,
+)
+```
+
+The notebook remains the primary interface; these identifiers simply create
+the boundary required for Phase B historical/reproducible runs and Phase C
+APIs.
+
+### Phase A notebook controls
+
+`03_quantvesting_run.ipynb` exposes two simple controls:
+
+```python
+REFRESH_SCREENER = False
+EOD_RUN = False
+```
+
+Set `REFRESH_SCREENER=True` when a new Screener workbook is available.
+
+Set `EOD_RUN=True` only for the final portfolio run of the day.
+
+Both default to `False`, so existing interactive runs do not write data
+accidentally.
+
+## Phase A → Phase B → Phase C
+
+```text
+PHASE A — NOW
+XLSX ingestion
+     ↓
+CSV repository
+     ↓
+portfolio_id + run_id
+     ↓
+EOD snapshot
+
+PHASE B — NEXT
+historical runs
+strategy versions
+data validation
+reproducibility
+
+PHASE C — MVP
+PostgreSQL repository
+     ↓
+FastAPI
+     ↓
+Web UI
+```
+
+The important architectural rule is:
+
+> **Notebooks orchestrate. The Quantvesting engine calculates. Repositories
+> persist. Reporting presents.**
+
+This keeps the investment logic independent of Google Drive, CSV, PostgreSQL,
+FastAPI, Web UI or Mobile.
