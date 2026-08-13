@@ -1,4 +1,4 @@
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/460c1ca1-5e7b-49fb-81cf-f41796ab042b" /># Quantvesting
+# Quantvesting
 
 **Peaceful investing using quants & data.**
 
