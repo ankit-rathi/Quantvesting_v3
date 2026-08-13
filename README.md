@@ -1,519 +1,1095 @@
-# Quantvesting — Product-ready engine v0.4
+# Quantvesting
 
-Quantvesting is being productised from an interactive Google Colab/Jupyter
-workflow into a reusable investment-analysis engine.
+> **Peaceful investing using quants & data.**
 
-The key architectural boundary in v0.4 is:
+Quantvesting is a data-driven investment decision framework designed to help busy investors answer two practical questions:
 
-> **Market/strategy data is shared and owned by Quantvesting. Portfolio data is owned by the individual user.**
+1. **What should I consider buying or accumulating?**
+2. **What should I consider selling or booking profits from in my existing portfolio?**
 
-This means a new user can provide their portfolio files in a folder and use
-the same Quantvesting engine without changing the investment logic or copying
-the shared market-data files into their portfolio folder.
+The core philosophy is:
 
-## Architecture
+> **Find high-quality Indian businesses trading below intrinsic value, combine fundamental, valuation and technical signals, construct a disciplined portfolio, and let the framework provide repeatable actions rather than relying on emotions or short-term price movements.**
+
+---
+
+# 1. What is Quantvesting?
+
+Quantvesting combines:
+
+* Quality investing
+* Value investing
+* Growth analysis
+* Quantitative ranking
+* Technical analysis
+* Portfolio allocation
+* Rule-based decision making
+
+The current universe is primarily based on **Nifty 500 companies**, with a filtered investable universe of approximately **50–60 businesses**.
+
+The framework ultimately produces two major analytical views:
+
+### Prospects Analysis
+
+Answers:
+
+> **Which businesses deserve my attention for buying/accumulation?**
+
+The primary ranking is `CumlRnk`.
+
+Lower `CumlRnk` = stronger prospect.
+
+### Portfolio Analysis
+
+Answers:
+
+> **Which stocks in my existing portfolio should I consider exiting/booking profits?**
+
+The primary exit candidate indicator is `FTT Amt`.
+
+Lower `FTT Amt` = stronger candidate for considering an exit when the target is reached.
+
+---
+
+# 2. Current Status
+
+## ✅ Phase A — Completed
+
+The current MVP engine has completed the first major architectural transition from notebook-centric code to a modular Python engine.
+
+Implemented:
+
+* Modular Quantvesting engine
+* Configuration-driven strategy
+* Prospect analysis
+* Portfolio analysis
+* Decision generation
+* Reporting layer
+* Shared market data
+* User-specific portfolio data
+* Screener XLSX → CSV ingestion
+* EOD portfolio snapshot capability
+* `portfolio_id` awareness
+* Separation of market data and portfolio data
+* Jupyter-based interface
+* Interactive DataTable output
+* Portfolio summary
+* Portfolio allocation visualization
+* DM + SV portfolio aggregation
+* Prospect ranking
+* Portfolio target/exit analysis
+* Basic action generation
+
+The architecture is now designed so that **Jupyter is the current interface rather than the core application**.
+
+---
+
+# 3. Current Architecture
 
 ```text
                          Quantvesting
-                              |
-              +---------------+---------------+
-              |                               |
-              v                               v
-       Shared Market Data              User Portfolio Data
-       market_data/                    portfolio_data/<user>/
-              |                               |
-              +---------------+---------------+
-                              |
-                              v
-                    Quantvesting Engine
-                              |
-          +-------------------+-------------------+
-          |                   |                   |
-          v                   v                   v
-     prospects.py        portfolio.py        decisions.py
-          |                   |                   |
-          +-------------------+-------------------+
-                              |
-                         reporting.py
-                              |
-                    +---------+---------+
-                    |                   |
-                    v                   v
-                 Jupyter            Future Web/API
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+              ▼                               ▼
+      Shared Market Data               User Portfolio Data
+       market_data/                    portfolio_data/<id>/
+              │                               │
+              └───────────────┬───────────────┘
+                              ▼
+                     Quantvesting Engine
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+          Prospects        Portfolio       Decisions
+              │               │               │
+              └───────────────┼───────────────┘
+                              ▼
+                         Reporting
+                              │
+                     ┌────────┴────────┐
+                     ▼                 ▼
+                  Jupyter            Web UI
 ```
 
-## Repository structure
+The key architectural principle is:
+
+> **Business logic lives in Python modules; notebooks and future Web/Mobile applications are only interfaces.**
+
+---
+
+# 4. Repository Structure
+
+Current target structure:
 
 ```text
-quantvesting_v3/
-|
-+-- config/
-|   +-- strategy.yaml
-|
-+-- market_data/                       # shared Quantvesting data
-|   +-- myProspectsScrips.csv
-|   +-- myScreenerDB.csv
-|   +-- myProspects-Momentum.csv
-|   +-- myScreenerDB.xlsx
-|
-+-- portfolio_data/
-|   +-- ankit/                          # current user's portfolio
-|       +-- myPortfolioStocks.csv
-|       +-- myInvestments.csv
-|       +-- myPortfolioAmts.json
-|       +-- myPortfolioDB.csv
-|       +-- myStocks-XIRR.csv
-|
-+-- portfolio_template/                # copy for a new user
-|   +-- portfolio_stocks.csv
-|   +-- investments.csv
-|   +-- portfolio_amounts.json
-|   +-- portfolio_history.csv
-|   +-- xirr.csv
-|   +-- README.md
-|
-+-- data/                               # legacy single-directory compatibility
-|
-+-- src/quantvesting/
-|   +-- data.py
-|   +-- features.py
-|   +-- technical.py
-|   +-- prospects.py
-|   +-- portfolio.py
-|   +-- decisions.py
-|   +-- reporting.py
-|   +-- __init__.py
-|
-+-- notebooks/
-|   +-- 01_prospect_analysis.ipynb
-|   +-- 02_portfolio_analysis.ipynb
-|   +-- 03_quantvesting_run.ipynb
-|
-+-- tests/
+quantvesting/
+│
+├── config/
+│   └── strategy.yaml
+│
+├── market_data/
+│   ├── myScreenerDB.csv
+│   └── ...
+│
+├── portfolio_data/
+│   └── <portfolio_id>/
+│       ├── myProspectsScrips.csv
+│       ├── myPortfolioStocks.csv
+│       ├── myInvestments.csv
+│       ├── myPortfolioDB.csv
+│       └── ...
+│
+├── src/
+│   └── quantvesting/
+│       ├── __init__.py
+│       ├── data.py
+│       ├── technical.py
+│       ├── features.py
+│       ├── prospects.py
+│       ├── portfolio.py
+│       ├── decisions.py
+│       ├── reporting.py
+│       └── ...
+│
+├── notebooks/
+│   ├── 01_prospect_analysis.ipynb
+│   ├── 02_portfolio_analysis.ipynb
+│   └── 03_quantvesting_run.ipynb
+│
+├── tests/
+│
+└── README.md
 ```
 
-The `data/` directory is retained only for backward compatibility with the
-original notebook/data layout. New code should use `market_data/` and
-`portfolio_data/<portfolio_id>/`.
+---
 
-## Data ownership model
+# 5. Data Architecture
 
-### Shared Quantvesting data
+Quantvesting deliberately separates **market data** from **portfolio data**.
 
-These files are common to all users:
+### Market data
 
-- `myProspectsScrips.csv`
-- `myScreenerDB.csv`
-- `myProspects-Momentum.csv`
-- `myScreenerDB.xlsx` (supporting source/workbook)
-
-They live under `market_data/`.
-
-### User-owned data
-
-Each user supplies:
-
-- `myPortfolioStocks.csv`
-- `myInvestments.csv`
-- `myPortfolioAmts.json` (optional; defaults to zero amounts)
-- `myPortfolioDB.csv` (optional history)
-- `myStocks-XIRR.csv` (optional supporting file)
-
-They live under a user-specific directory such as:
+Shared across all future users:
 
 ```text
-portfolio_data/ankit/
+market_data/
 ```
 
-A future web application can map this directory to an authenticated
-`portfolio_id` without changing the engine.
+Examples:
 
-## New data-loading API
+* Screener data
+* Price data
+* Technical indicators
+* Financial metrics
+* Valuation metrics
 
-Use the explicit loaders in new notebooks/application code:
+### Portfolio data
 
-```python
-from quantvesting import (
-    load_market_data,
-    load_portfolio_data,
-)
-
-market_data = load_market_data(MARKET_DATA_DIR)
-portfolio_data = load_portfolio_data(PORTFOLIO_DATA_DIR)
-```
-
-Or load both in one call:
-
-```python
-from quantvesting import load_quantvesting_data
-
-market_data, portfolio_data = load_quantvesting_data(
-    MARKET_DATA_DIR,
-    PORTFOLIO_DATA_DIR,
-)
-```
-
-For prospect analysis, `portfolio_data` can be `None` if the user wants
-prospects without portfolio membership information.
-
-## New user onboarding
-
-A new user should not modify Python code.
-
-1. Copy `portfolio_template/` to a user-specific location.
-2. Fill in `portfolio_stocks.csv`.
-3. Fill in `investments.csv`.
-4. Fill optional portfolio amounts/history files if required.
-5. Point `PORTFOLIO_DATA_DIR` in the notebook to that folder.
-6. Run the same notebook.
-
-For example:
+Specific to each investor:
 
 ```text
-portfolio_data/
-    friend_001/
-        myPortfolioStocks.csv
-        myInvestments.csv
-        myPortfolioAmts.json
+portfolio_data/<portfolio_id>/
 ```
 
-The shared `market_data/` remains unchanged.
+Examples:
 
-## Portfolio vs security level
+* Prospect universe
+* Portfolio holdings
+* Investments
+* EOD snapshots
 
-This distinction is important for the framework.
+This separation is critical for future multi-user support.
+
+A future user should be able to provide:
 
 ```text
-Portfolio source
-holding/account level
-        |
-        | ABBOTINDIA / DM
-        | ABBOTINDIA / SV
-        v
-Portfolio analysis
-aggregate shares + investment by Symbol
-        |
-        v
-Security-level result
-ABBOTINDIA
+portfolio_data/user123/
 ```
 
-Prospect analysis is always security-level. Therefore portfolio membership is
-aggregated before joining:
+without changing the Quantvesting engine.
+
+---
+
+# 6. Screener Data Pipeline
+
+Current workflow:
 
 ```text
-ABBOTINDIA / DM
-ABBOTINDIA / SV
-       |
-       v
-ABBOTINDIA / DM+SV
-       |
-       v
-Prospects
+myScreenerDB.xlsx
+        │
+        ▼
+Screener ingestion
+        │
+        ▼
+myScreenerDB.csv
+        │
+        ▼
+Shared market data
+        │
+        ▼
+Prospect / Portfolio analysis
 ```
 
-This prevents duplicate prospect rows when a stock exists in multiple
-accounts.
+The ingestion process is intended to behave as a **refresh/upsert**, rather than blindly appending duplicate records.
 
-The original holding-level records remain available to portfolio analysis,
-so DM/SV shares and average costs continue to aggregate correctly.
-
-Portfolio analysis is now account-label agnostic: DM/SV continue to work as
-before, while future users can use other account labels without changing the
-engine.
-
-## Public engine interface
-
-### Prospect analysis
-
-```python
-prospects = qv.prospects(
-    market_data,
-    portfolio_data=portfolio_data,
-    include_portfolio=True,
-)
-```
-
-Without portfolio information:
-
-```python
-prospects = qv.prospects(
-    market_data,
-    portfolio_data=None,
-    include_portfolio=False,
-)
-```
-
-### Portfolio analysis
-
-```python
-portfolio, summary = qv.portfolio(
-    market_data,
-    portfolio_data=portfolio_data,
-)
-```
-
-The engine returns structured data only. It does not print or display results.
-
-### Backward compatibility
-
-The original API is still supported:
-
-```python
-from quantvesting import load_all_data
-
-data = load_all_data("/path/to/old/data")
-
-prospects = qv.prospects(data, include_portfolio=True)
-portfolio, summary = qv.portfolio(data)
-```
-
-This allows existing notebooks/integrations to migrate gradually.
-
-## Notebook presentation
-
-The notebooks remain the primary interface until the Web UI/MVP stage.
-
-Prospect display order:
+Conceptually:
 
 ```text
-Symbol, FTT, Dev%_200, Dev%_PE, Spread%, Conviction, Cyclical,
-RSI_14, RSP, FTT%, ATH%, Gained%, CumlRnk, ROE%/PE, Criteria,
-Strategy, Category, InFolio
+Existing CSV
+     +
+Latest XLSX
+     ↓
+Identify security
+     ↓
+Replace latest record
+     ↓
+Updated CSV
 ```
 
-Portfolio display order:
+This prevents the market dataset from accumulating duplicate securities across refreshes.
+
+---
+
+# 7. Prospect Analysis
+
+Prospect analysis evaluates businesses using multiple dimensions.
+
+Current conceptual model:
 
 ```text
-Symbol, Today P/L%, Current P/L%, FTT%, OTT%, FTT Amt, Current P/L,
-Current, FTT, Dev%_PE, RSI_14, Conviction, Spread%, CumlRnk, RRR Ind,
-CurrAlloc%, Gained%, Criteria, Strategy, Category
+                    Nifty 500
+                       │
+                       ▼
+              Quality / Eligibility
+                       │
+                       ▼
+                  Value
+                       │
+                       ▼
+                  Growth
+                       │
+                       ▼
+                 Momentum
+                       │
+                       ▼
+                Upside / FTT
+                       │
+                       ▼
+               Cumulative Rank
+                       │
+                       ▼
+              Prospect Candidates
 ```
 
-The portfolio notebook also renders:
+Current ranking incorporates factors such as:
 
-- compact IST run summary
-- Deployed / Current / CAGR-XIRR
-- current-value category donut chart
+* Deviation from 200 DMA
+* Deviation from PE
+* ROE / PE
+* Sales growth
+* Profit growth
+* FTT upside
+* Market capitalisation
+* ROE
+* CFO / EBITDA
+* RSI
+* Gained %
+* Conviction
+* Business category
 
-These are presentation helpers in `reporting.py`, not investment logic.
+The resulting `CumlRnk` provides a single ranking mechanism.
 
-## Prospect ranking
-
-The ranking logic previously embedded in the prospect notebook is now in
-`prospects.py`. It calculates:
-
-- Value rank: `Dev%_200`, `Dev%_PE`, `ROE%/PE`
-- Growth rank: `Sales_Grwth%`, `Profit_Grwth%`
-- Quality rank: `FTT%`, `MCap`, `ROE%`, `CFO_2_EBITDA%`
-- Momentum rank: `Gained%`, `RSI_14`
-- Overall rank: sum of category scores
-- Category rank: rank within `Conviction`
-- Final `CumlRnk`: ordered by Conviction Priority and category rank
-
-The defaults reproduce the supplied notebook methodology: equal category
-weights and the explicit Conviction Priority map.
-
-## Productisation boundary
-
-The intended evolution is:
+### Interpretation
 
 ```text
-Today
-
-Jupyter -> Quantvesting Engine -> CSV/JSON + Yahoo Finance
-
-Next
-
-Jupyter -> Quantvesting Engine <- shared market data
-                              <- user portfolio data
-
-MVP
-
-Jupyter / Web -> API -> Quantvesting Engine
-                       |
-              +--------+--------+
-              |                 |
-        Market Data        User Portfolio
+Lower CumlRnk
+      ↓
+Stronger prospect
+      ↓
+BUY / ACCUMULATE candidate
 ```
 
-The investment methodology should not move into the notebooks or UI. Those
-layers should only supply inputs and present structured engine outputs.
+The framework is intentionally designed to make the reasoning visible through the underlying scores rather than presenting an unexplained black-box recommendation.
 
-## Development sequence
+---
 
-1. Validate engine output against the existing notebook.
-2. Keep the market-data/user-portfolio boundary stable.
-3. Freeze Quantvesting strategy versions.
-4. Add golden-output/regression tests.
-5. Formalise the decision engine.
-6. Add historical recommendation/run tracking.
-7. Expose the engine through an API.
-8. Build the Web UI on top of the same public interface.
-9. Add authentication, subscriptions and multi-user storage only after the
-   engine is stable.
+# 8. Portfolio Analysis
 
+Portfolio analysis operates at the **security level**.
 
-## Phase A — operationalisation
-
-Phase A is implemented without changing the notebook-first workflow.
-
-### 1. Screener XLSX ingestion
-
-The notebook no longer needs to contain the XLSX-to-CSV transformation logic.
-The same logic is available through:
-
-```python
-from quantvesting import Quantvesting, load_config
-
-config = load_config("config/strategy.yaml")
-qv = Quantvesting(config)
-
-df_screener = qv.ingest_screener("market_data")
-```
-
-The ingestion:
-
-1. reads `myScreenerDB.xlsx`
-2. extracts Screener hyperlinks from `Name`
-3. derives `Symbol`
-4. merges with the existing `myScreenerDB.csv`
-5. recalculates LC/MC/SC using market-cap ordering
-6. writes the canonical `myScreenerDB.csv`
-
-The workbook is still the source; the CSV is the engine-ready snapshot.
-
-### 2. EOD snapshot persistence
-
-Portfolio analysis now accepts:
-
-```python
-portfolio, summary = qv.portfolio(
-    market_data,
-    portfolio_data=portfolio_data,
-    portfolio_id="ankit",
-    run_id="run_...",
-    eod=True,
-)
-```
-
-When `eod=True`, the engine persists the final summary to:
+DM and SV holdings may contain separate records:
 
 ```text
-portfolio_data/<portfolio_id>/myPortfolioDB.csv
+HYUNDAI   DM
+HYUNDAI   SV
 ```
 
-The same day's snapshot is replaced when the EOD run is repeated. This
-prevents duplicate daily snapshots.
-
-Each new snapshot carries:
-
-- `portfolio_id`
-- `run_id`
-- `run_datetime`
-- `strategy_version`
-- the existing portfolio summary metrics
-
-Older `myPortfolioDB.csv` rows remain readable; the new metadata columns are
-added only to newly generated snapshots.
-
-### 3. Repository abstraction
-
-The engine now separates analysis from persistence:
+but Quantvesting should ultimately treat them as:
 
 ```text
-Quantvesting Engine
-       |
-       +--> MarketDataRepository
-       |       |
-       |       +--> FileMarketDataRepository   (now)
-       |       +--> PostgreSQL repository       (later)
-       |
-       +--> PortfolioRepository
-               |
-               +--> FilePortfolioRepository    (now)
-               +--> PostgreSQL repository       (later)
+HYUNDAI   aggregated position
 ```
 
-The current Jupyter/Colab implementation uses the file repositories. This is
-the deliberate Phase A boundary for the future PostgreSQL/Web API MVP.
+Therefore the intended portfolio grain is:
 
-### 4. Portfolio/run awareness
+> **One row per Symbol.**
 
-Portfolio data is identified by `portfolio_id`. Every engine execution can
-also be identified by a `run_id`.
+Portfolio analysis calculates:
+
+* Current value
+* Average cost
+* Current P/L
+* Today P/L
+* Current allocation
+* FTT
+* FTT %
+* OTT %
+* FTT Amount
+* RRR
+* Technical indicators
+* Conviction
+* Cumulative rank
+* Risk indicators
+* XIRR
+
+---
+
+# 9. Portfolio Decision Philosophy
+
+The decision engine is intentionally simple.
+
+### Buy / Accumulate
+
+Prospect candidates are primarily driven by:
+
+```text
+LOW CumlRnk
+```
+
+Therefore:
+
+```text
+Lower CumlRnk
+       ↓
+Stronger prospect
+       ↓
+BUY / ACCUMULATE candidate
+```
+
+### Sell / Book Profit
+
+Portfolio candidates are primarily driven by:
+
+```text
+LOW FTT Amt
+```
+
+Therefore:
+
+```text
+Lower FTT Amt
+       ↓
+Target is closer / less remaining upside
+       ↓
+EXIT / BOOK PROFIT candidate
+```
+
+`FTT` represents the **Final Technical Target**, combining the framework's valuation and technical target logic.
+
+Importantly:
+
+> `EXIT_TARGET` means **exit when the target is reached**, not an instruction to immediately sell the stock merely because the target exists.
+
+---
+
+# 10. Portfolio Summary
+
+The notebook provides a concise investor-oriented summary:
+
+```text
+Run date time (IST): 2026-08-08 15:13:55
+
+Deployed:  1.46 C
+Current:   1.62 C
+CAGR/XIRR %: 4.66%
+```
+
+Detailed portfolio metrics remain available from the engine for future Web UI/API consumption.
+
+---
+
+# 11. Jupyter Interface
+
+Jupyter/Google Colab is currently the primary interface because it provides:
+
+* Interactive development
+* Easy experimentation
+* Rapid strategy changes
+* Interactive DataTables
+* Charts
+* Easy access to Google Drive
+* Low infrastructure cost
+
+The important architectural decision is:
+
+> **Jupyter is not the product. The Quantvesting Engine is the product.**
+
+The notebook is simply the first client of the engine.
+
+---
+
+# 12. Phase B — Current Focus
+
+Phase B is focused on making Quantvesting **reproducible, auditable and production-ready** before introducing the Web/API layer.
+
+## Phase B roadmap
+
+### 1. Run ID
+
+Every Quantvesting execution receives a unique:
+
+```text
+run_id
+```
 
 Example:
 
-```python
-RUN_ID = create_run_id()
-
-df_prospects = qv.prospects(
-    market_data,
-    portfolio_data=portfolio_data,
-    portfolio_id="ankit",
-    run_id=RUN_ID,
-)
-
-df_portfolio, summary = qv.portfolio(
-    market_data,
-    portfolio_data=portfolio_data,
-    portfolio_id="ankit",
-    run_id=RUN_ID,
-    eod=False,
-)
+```text
+QV-20260808-151355-001
 ```
 
-The notebook remains the primary interface; these identifiers simply create
-the boundary required for Phase B historical/reproducible runs and Phase C
-APIs.
+---
 
-### Phase A notebook controls
+### 2. Portfolio ID
 
-`03_quantvesting_run.ipynb` exposes two simple controls:
-
-```python
-REFRESH_SCREENER = False
-EOD_RUN = False
-```
-
-Set `REFRESH_SCREENER=True` when a new Screener workbook is available.
-
-Set `EOD_RUN=True` only for the final portfolio run of the day.
-
-Both default to `False`, so existing interactive runs do not write data
-accidentally.
-
-## Phase A → Phase B → Phase C
+Every user/portfolio is identified independently:
 
 ```text
-PHASE A — NOW
-XLSX ingestion
-     ↓
-CSV repository
-     ↓
-portfolio_id + run_id
-     ↓
-EOD snapshot
-
-PHASE B — NEXT
-historical runs
-strategy versions
-data validation
-reproducibility
-
-PHASE C — MVP
-PostgreSQL repository
-     ↓
-FastAPI
-     ↓
-Web UI
+portfolio_id
 ```
 
-The important architectural rule is:
+Example:
 
-> **Notebooks orchestrate. The Quantvesting engine calculates. Repositories
-> persist. Reporting presents.**
+```text
+portfolio_001
+portfolio_002
+```
 
-This keeps the investment logic independent of Google Drive, CSV, PostgreSQL,
-FastAPI, Web UI or Mobile.
+This enables multiple investors to use the same engine.
+
+---
+
+### 3. Strategy Version
+
+Every run records the strategy configuration/version.
+
+Example:
+
+```text
+strategy_version: 1.2
+```
+
+This is important because recommendations must remain explainable even after the strategy changes.
+
+---
+
+### 4. Run Manifest
+
+Each run should capture:
+
+```text
+run_id
+portfolio_id
+strategy_version
+run_timestamp
+market_data_version
+portfolio_data_version
+configuration
+engine_version
+```
+
+Conceptually:
+
+```text
+                 RUN
+                  │
+      ┌───────────┼───────────┐
+      ▼           ▼           ▼
+   Portfolio   Strategy    Market Data
+      │           │           │
+      └───────────┼───────────┘
+                  ▼
+             Reproducible
+                Result
+```
+
+---
+
+### 5. Historical Run Tracking
+
+Quantvesting should eventually answer:
+
+> "What did the engine recommend three months ago?"
+
+rather than only:
+
+> "What does it recommend today?"
+
+This enables:
+
+* Historical recommendations
+* Performance tracking
+* Strategy comparison
+* Backtesting
+* Auditability
+
+---
+
+### 6. Data Validation
+
+Validation should become a first-class component.
+
+Examples:
+
+```text
+✓ One row per Symbol
+✓ No unexpected duplicates
+✓ Required columns present
+✓ Numeric fields valid
+✓ Dates valid
+✓ Market data sufficiently fresh
+✓ Portfolio holdings valid
+✓ No missing critical metrics
+```
+
+A particularly important invariant is:
+
+```text
+Portfolio Analysis
+        ↓
+Exactly ONE row per Symbol
+```
+
+Duplicate symbols should raise a validation error rather than silently being dropped.
+
+---
+
+### 7. Reproducible Runs
+
+Given:
+
+```text
+run_id
++
+strategy_version
++
+market_data_version
++
+portfolio_data_version
+```
+
+Quantvesting should eventually be able to reproduce the same analysis.
+
+This is a major transition from:
+
+> personal notebook
+
+to:
+
+> investment analytics product.
+
+---
+
+# 13. Phase C — Free MVP Architecture
+
+After Phase B, the next transition is:
+
+```text
+                    Quantvesting Engine
+                           │
+                         FastAPI
+                           │
+                    PostgreSQL
+                           │
+              ┌────────────┴────────────┐
+              ▼                         ▼
+           Web UI                    Mobile
+```
+
+The initial MVP can be built largely using free/open-source or free-tier infrastructure.
+
+Potential architecture:
+
+```text
+GitHub
+   │
+   ├── Source Code
+   └── Web Frontend
+           │
+           ▼
+      Web Application
+           │
+           ▼
+         FastAPI
+           │
+           ▼
+       PostgreSQL
+           │
+           ▼
+   Quantvesting Engine
+```
+
+The important point is that the current Python engine should **not need to be rewritten** when this transition happens.
+
+---
+
+# 14. Phase C Roadmap
+
+### 9. PostgreSQL
+
+Move persistent data from CSV/files toward relational storage.
+
+Likely entities:
+
+```text
+users
+portfolios
+portfolio_holdings
+prospects
+market_data
+runs
+run_manifests
+strategy_versions
+recommendations
+portfolio_snapshots
+```
+
+---
+
+### 10. FastAPI
+
+Expose the Quantvesting engine through APIs.
+
+Potential endpoints:
+
+```text
+GET  /prospects
+GET  /portfolio
+GET  /decisions
+GET  /runs
+GET  /runs/{run_id}
+GET  /portfolio/{portfolio_id}
+POST /portfolio/{portfolio_id}/run
+```
+
+---
+
+### 11. Web UI
+
+The first web MVP should focus on the **decision experience**, not reproduce the notebook.
+
+Potential dashboard:
+
+```text
+QUANTVESTING
+────────────────────────
+
+Portfolio
+₹1.62 Cr
+
+Deployed
+₹1.46 Cr
+
+XIRR
+4.66%
+
+────────────────────────
+
+BUY / ACCUMULATE
+Top prospects
+
+1. ABC
+2. XYZ
+3. PQR
+
+────────────────────────
+
+EXIT / BOOK PROFIT
+
+1. HYUNDAI
+2. 5PAISA
+3. ABC
+
+────────────────────────
+
+Portfolio
+Allocation | P/L | Targets
+```
+
+---
+
+# 15. Phase D — Productisation
+
+Once the engine + API + Web UI are stable:
+
+### Authentication
+
+Users can securely access their own portfolio.
+
+### User onboarding
+
+A new user should be able to:
+
+```text
+Create account
+      ↓
+Create portfolio
+      ↓
+Upload/import portfolio data
+      ↓
+Run Quantvesting
+      ↓
+See recommendations
+```
+
+without changing Python code.
+
+### Subscription
+
+Possible future model:
+
+```text
+Free
+    ↓
+Basic
+    ↓
+Premium
+```
+
+Potential differentiation could be based on:
+
+* Portfolio size
+* Historical analytics
+* Advanced insights
+* Alerts
+* Multiple portfolios
+* Advanced strategy analytics
+
+### Mobile
+
+Mobile should consume the same APIs rather than contain separate investment logic.
+
+```text
+              Quantvesting API
+                     │
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+        Web        Mobile     Future
+                               Clients
+```
+
+---
+
+# 16. Five-Year Vision
+
+Quantvesting aims to become:
+
+> **A platform for peaceful investing using quants and data.**
+
+The long-term product should reduce:
+
+```text
+Noise
+  ↓
+Emotion
+  ↓
+Decision fatigue
+  ↓
+Impulsive investing
+```
+
+and replace it with:
+
+```text
+Data
+  ↓
+Framework
+  ↓
+Ranking
+  ↓
+Decision
+  ↓
+Discipline
+  ↓
+Peaceful investing
+```
+
+---
+
+# 17. What Quantvesting Is NOT
+
+Quantvesting is not intended to encourage:
+
+* Day trading
+* Short-term speculation
+* Chasing price movements
+* Blind following of recommendations
+* Excessive portfolio turnover
+* Concentrated bets
+* Emotion-driven decisions
+
+The intended user is a:
+
+> **Busy professional who wants a systematic way to manage long-term equity investments without constantly monitoring the market.**
+
+---
+
+# 18. Current Product Philosophy
+
+The central product loop is:
+
+```text
+             MARKET
+                │
+                ▼
+        Quantitative Analysis
+                │
+       ┌────────┴────────┐
+       ▼                 ▼
+   PROSPECTS          PORTFOLIO
+       │                 │
+ CumlRnk ↓          FTT Amt ↓
+       │                 │
+       ▼                 ▼
+ BUY / ACCUMULATE     EXIT / TARGET
+       │                 │
+       └────────┬────────┘
+                ▼
+             DECISION
+                │
+                ▼
+          INVESTOR ACTION
+                │
+                ▼
+             HISTORY
+                │
+                ▼
+             LEARNING
+```
+
+---
+
+# 19. Design Principles
+
+### 1. Engine first
+
+Business logic must remain independent of UI.
+
+### 2. Configuration over hard-coding
+
+Investment strategy should live in configuration wherever practical.
+
+### 3. One source of truth
+
+Market data and portfolio data should have clearly defined ownership.
+
+### 4. One row = one security
+
+Portfolio and prospect analytical datasets should maintain an explicit grain.
+
+### 5. No silent data corruption
+
+Validation should fail loudly rather than silently dropping records.
+
+### 6. Reproducibility
+
+Every recommendation should eventually be traceable to:
+
+```text
+Data
++
+Strategy Version
++
+Engine Version
++
+Portfolio
++
+Run
+```
+
+### 7. UI independence
+
+The same engine should serve:
+
+```text
+Jupyter
+Web
+Mobile
+API
+```
+
+### 8. Incremental productisation
+
+Don't prematurely build a complex platform.
+
+```text
+Notebook
+   ↓
+Modular Engine
+   ↓
+Validated Engine
+   ↓
+Database
+   ↓
+API
+   ↓
+Web
+   ↓
+Mobile
+   ↓
+Scale
+```
+
+---
+
+# 20. Current → Future Journey
+
+```text
+TODAY
+
+Jupyter + CSV
+     │
+     ▼
+Quantvesting Engine
+     │
+     ▼
+Personal Portfolio
+```
+
+↓
+
+```text
+PHASE B
+
+Engine
+ + Run ID
+ + Portfolio ID
+ + Strategy Version
+ + Validation
+ + Historical Runs
+ + Reproducibility
+```
+
+↓
+
+```text
+PHASE C
+
+PostgreSQL
+     │
+     ▼
+FastAPI
+     │
+     ▼
+Web MVP
+```
+
+↓
+
+```text
+PHASE D
+
+Authentication
+     │
+     ▼
+User Onboarding
+     │
+     ▼
+Subscriptions
+     │
+     ▼
+Mobile
+```
+
+↓
+
+```text
+LONG TERM
+
+                    QUANTVESTING
+                         │
+          ┌──────────────┼──────────────┐
+          ▼              ▼              ▼
+       Investor       Data/AI        Community
+       Platform       Engine         Learning
+          │              │              │
+          └──────────────┼──────────────┘
+                         ▼
+              PEACEFUL INVESTING
+                 USING QUANTS
+                    & DATA
+```
+
+---
+
+# 21. Current Priority
+
+The immediate priority is **not Web UI, mobile or monetisation**.
+
+The priority is:
+
+```text
+1. Finish Phase B
+        ↓
+2. Make every run reproducible
+        ↓
+3. Make data quality explicit
+        ↓
+4. Stabilise the engine
+        ↓
+5. Introduce PostgreSQL
+        ↓
+6. Expose engine through FastAPI
+        ↓
+7. Build Web MVP
+```
+
+The strategic objective is to make the following statement true:
+
+> **A new user can provide their portfolio data, run Quantvesting, and receive the same quality of analysis without modifying the Quantvesting code.**
+
+That is the real milestone between **"my investment notebook"** and **"Quantvesting as a product."**
+
+---
+
+### Current status at a glance
+
+| Area                        | Status     |
+| --------------------------- | ---------- |
+| Investment framework        | ✅          |
+| Prospect analysis           | ✅          |
+| Portfolio analysis          | ✅          |
+| Decision engine             | ✅          |
+| Reporting                   | ✅          |
+| Config-driven strategy      | ✅          |
+| Market/portfolio separation | ✅          |
+| Screener ingestion          | ✅          |
+| EOD snapshot                | ✅          |
+| Multi-portfolio foundation  | 🟡         |
+| Run ID                      | 🟡 Phase B |
+| Strategy versioning         | 🟡 Phase B |
+| Historical runs             | 🟡 Phase B |
+| Data validation             | 🟡 Phase B |
+| Reproducibility             | 🟡 Phase B |
+| PostgreSQL                  | ⏳ Phase C  |
+| FastAPI                     | ⏳ Phase C  |
+| Web UI                      | ⏳ Phase C  |
+| Authentication              | ⏳ Phase D  |
+| User onboarding             | ⏳ Phase D  |
+| Subscription                | ⏳ Phase D  |
+| Mobile                      | ⏳ Phase D  |
+
+**North Star:**
+
+> ### Quantvesting = From *“What should I buy/sell?”* to *“Why, when, and according to which repeatable framework?”* — enabling peaceful investing using quants & data.
