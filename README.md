@@ -1,6 +1,16 @@
-# Quantvesting
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/460c1ca1-5e7b-49fb-81cf-f41796ab042b" /># Quantvesting
 
-> **Peaceful investing using quants & data.**
+**Peaceful investing using quants & data.**
+
+<p align="center">
+  <img 
+    src="https://github.com/user-attachments/assets/bce3280d-2e2c-4ad8-ba6e-da8b1bcd49f4"
+    alt="AI Agents"
+    style="width:100%; max-width:1200px; height:auto; border-radius:8px;"
+  />
+</p>
+
+
 
 Quantvesting is a data-driven investment decision framework designed to help busy investors answer two practical questions:
 
