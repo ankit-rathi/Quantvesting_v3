@@ -248,8 +248,9 @@ The same structured objects are suitable for a future API.
 
 Current transparent baseline actions remain:
 
-- Portfolio: `EXIT_TARGET` when `Current >= FTT`, otherwise `HOLD`.
-- Prospects: top-N by `CumlRnk` are `BUY_CANDIDATE`, otherwise `WATCHLIST`.
+- Portfolio: `EXIT_TARGET` when the **per-share CMP** reaches/exceeds FTT; `REVIEW_ROTATION` for CORE holdings whose thesis is substantially captured; `WAIT_FOR_EXIT_WINDOW` for LEGACY holdings; otherwise `HOLD`.
+- Prospects: top-N by `CumlRnk` are `BUY_CANDIDATE`, otherwise `WATCHLIST`. Only CORE prospects receive `CumlRnk`.
+- Capital rotation: `REVIEW_ROTATION` when a mature holding can be paired with a sufficiently attractive CORE prospect. This is advisory, not an automatic SELL.
 
 These are deliberately separated from the analytical engine so the decision methodology can evolve independently.
 
@@ -302,3 +303,42 @@ Jupyter / Web API / Mobile
 ```
 
 The calculation modules should not need to know whether data came from CSV or PostgreSQL. Phase C therefore focuses on implementing new repository/API adapters rather than rewriting the investment engine.
+
+## Strategy refinement — v0.5
+
+Phase B is now refined around the actual Quantvesting portfolio philosophy. The original conviction hierarchy is preserved exactly:
+
+```text
+X-LC → H-LC → X-MC → X-SC → M-LC → H-MC → H-SC → L-LC → M-MC → M-SC → L-MC → L-SC
+```
+
+The first six buckets are the current preferred/core opportunity universe. The remaining six buckets are **LEGACY** rather than invalid: they remain visible in the portfolio and can be managed/rotated later, including during a favourable broad-market/bull phase. They do not compete for new-capital ranking through `CumlRnk`.
+
+### New prospect fields
+
+- `BusinessQuality`: X/H/M/L derived from Conviction.
+- `PortfolioClass`: `CORE` or `LEGACY`.
+- `Eligible`: whether the conviction belongs to the current six-bucket core universe.
+- `OpportunityScore`: current `Ovrl_Rank`, retained as a descriptive score (lower is better).
+- `OpportunityBand`: descriptive HIGH / ATTRACTIVE / WATCH band; it does not change ranking.
+
+The existing Value + Growth + Quality + Momentum ranking and conviction-priority ordering remain intact for CORE securities.
+
+### New portfolio fields
+
+- `ThesisCaptured%`: `(Current - AvgCost) / (FTT - AvgCost)` when a valid positive thesis range exists.
+- `RemainingUpside%`: `(FTT - Current) / Current`.
+- `RotationStatus`: `HOLD`, `ROTATION_REVIEW`, `STRONG_ROTATION_REVIEW`, `LEGACY_HOLD` or `TARGET_REACHED`.
+- `PortfolioClass` and `BusinessQuality`.
+
+`RRR Ind` remains available and unchanged. `ThesisCaptured%` is a more explicit representation of the same capital-rotation intuition.
+
+### Capital rotation
+
+`qv.capital_rotation(prospects, portfolio)` compares mature portfolio positions with the best available CORE prospect. It returns `REVIEW_ROTATION` candidates when the configured thesis-capture threshold is reached and the alternative has sufficient FTT upside. It is intentionally advisory and does **not** issue an automatic SELL instruction.
+
+Configuration is under `rotation:` in `config/strategy.yaml`; the initial 80% review threshold and 90% strong-review threshold are hypotheses to be evaluated through historical Phase-B run data, not permanent optimised constants.
+
+### Why legacy positions are retained
+
+Quantvesting does not force an immediate exit simply because a holding falls outside the preferred six conviction buckets. Those positions are explicitly classified as `LEGACY`, remain part of portfolio analysis, and can be reviewed for exit/rotation when the market provides a suitable opportunity.
