@@ -1,0 +1,148 @@
+# Quantvesting Strategy Configuration
+# QV v0.2 — ranking logic is now config-driven while preserving the
+# current notebook methodology by default.
+
+strategy:
+  name: QV_CORE
+  version: "0.5"
+
+data:
+  lookback_days: 365
+  end_date_offset_days: 1
+  nifty_symbol_suffix: ".NS"
+  relative_strength_period: "1mo"
+
+universe:
+  exclude_symbols:
+    - "SCHAEFFLER "
+    - "MCDOWELL-N"
+    - "UJJIVAN"
+    - "TIPSINDLTD"
+    - "TV18BRDCST"
+    - "DRREDDY"
+
+prospects:
+  max_count: 60
+  latest_quarter_required: true
+  star_stock_required: true
+
+ranking:
+  # Candidate universe used by the notebook ranking logic.
+  quality_mbq_contains:
+    - X40
+    - X5K
+
+  # Explicit exclusions are applied after the inclusion test. This preserves
+  # the original set(X40 + X5K + conviction) - set(OX40 + OX40N) behaviour.
+  quality_mbq_exclude_contains:
+    - OX40
+    - OX40N
+
+  quality_convictions:
+    - X-LC
+    - H-LC
+    - X-MC
+    - X-SC
+
+  # Category definitions reproduce the current notebook.
+  categories:
+    value:
+      - Dev%_200
+      - Dev%_PE
+      - ROE%/PE
+    growth:
+      - Sales_Grwth%
+      - Profit_Grwth%
+    quality:
+      - FTT%
+      - MCap
+      - ROE%
+      - CFO_2_EBITDA%
+    momentum:
+      - Gained%
+      - RSI_14
+
+  # True = ascending rank is better; False = descending rank is better.
+  directions:
+    Dev%_200: true
+    Dev%_PE: true
+    ROE%/PE: false
+    Sales_Grwth%: false
+    Profit_Grwth%: false
+    FTT%: false
+    MCap: false
+    ROE%: false
+    CFO_2_EBITDA%: false
+    Gained%: true
+    RSI_14: false
+
+  # Equal weights preserve the current framework. These are deliberately
+  # configurable for future optimisation/experimentation.
+  category_weights:
+    value: 1.0
+    growth: 1.0
+    quality: 1.0
+    momentum: 1.0
+
+  # New capital is ranked only within these six preferred conviction buckets.
+  # The complete priority map below is retained because lower buckets represent
+  # legacy holdings that should remain visible and manageable.
+  rankable_convictions:
+    - X-LC
+    - H-LC
+    - X-MC
+    - X-SC
+    - M-LC
+    - H-MC
+
+  conviction_priority:
+    X-LC: 0
+    H-LC: 1
+    X-MC: 2
+    X-SC: 3
+    M-LC: 4
+    H-MC: 5
+    H-SC: 6
+    L-LC: 7
+    M-MC: 8
+    M-SC: 9
+    L-MC: 10
+    L-SC: 11
+
+rotation:
+  # These thresholds are decision/alert thresholds, not automatic sell rules.
+  thesis_captured:
+    watch: 0.75
+    review: 0.80
+    strong_review: 0.90
+    target: 1.00
+  minimum_alternative_upside: 0.20
+
+portfolio:
+  min_holdings: 20
+  max_holdings: 50
+  standard_max_allocation_pct: 3
+  exceptional_max_allocation_pct: 5
+  sector_max_allocation_pct: 20
+
+targets:
+  min_upside_large_cap_pct: 20
+  min_upside_mid_cap_pct: 50
+  min_upside_small_cap_pct: 100
+
+technical:
+  sma_short: 20
+  sma_mid: 50
+  sma_long: 200
+  rsi_window: 14
+
+ingestion:
+  screener:
+    xlsx_file: myScreenerDB.xlsx
+    csv_file: myScreenerDB.csv
+    sheet_name: data
+    hyperlink_columns:
+      - Name
+    row_header: 1
+    large_cap_count: 100
+    mid_cap_count: 150
