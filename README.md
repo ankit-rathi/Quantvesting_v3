@@ -1,12 +1,10 @@
-# Quantvesting — Product-ready engine v0.5 (Phase B)
+# Quantvesting — Product-ready engine v0.6 (Phase B + Customer Onboarding)
 
-Quantvesting is being productised from an interactive Google Colab/Jupyter workflow into a reusable investment-analysis engine.
+Quantvesting is a notebook-first investment-analysis engine built around a curated universe of quality Indian businesses, valuation discipline, FTT-based opportunity assessment and transparent portfolio intelligence.
 
-> **Philosophy:** peaceful investing using quants/data.
+> **Product principle:** minimum customer input → maximum analytical value.
 
-> **Core problem:** find high-quality Indian businesses trading below intrinsic value.
-
-The current engine remains notebook-first and CSV-backed, but its internal boundaries are now designed so the same calculation engine can later serve a web/mobile product and PostgreSQL without rewriting the investment logic.
+The current implementation remains CSV-backed and Jupyter/Colab-friendly. The calculation engine is separated from repositories and presentation so storage/API/UI can evolve later without rewriting the core methodology.
 
 ## Current architecture
 
@@ -41,358 +39,157 @@ The current engine remains notebook-first and CSV-backed, but its internal bound
               CSV files             Future PostgreSQL
                               |
                               v
-                 Reporting / Jupyter today
-                         Web/API later
+                         Jupyter today
+                         API/UI later
 ```
 
-## Repository structure
+## Customer-first data model
 
-```text
-quantvesting_v3/
-|
-+-- config/
-|   +-- strategy.yaml
-|
-+-- market_data/                       # shared Quantvesting data
-|   +-- myProspectsScrips.csv
-|   +-- myScreenerDB.csv
-|   +-- myProspects-Momentum.csv
-|   +-- myScreenerDB.xlsx
-|
-+-- portfolio_data/
-|   +-- ankit/
-|       +-- myPortfolioStocks.csv
-|       +-- myInvestments.csv
-|       +-- myPortfolioAmts.json
-|       +-- myPortfolioDB.csv
-|       +-- myStocks-XIRR.csv
-|       +-- myRuns.csv                 # Phase-B run manifests
-|
-+-- portfolio_template/
-|   +-- ...
-|
-+-- src/quantvesting/
-|   +-- data.py
-|   +-- ingestion.py
-|   +-- validation.py
-|   +-- run_context.py
-|   +-- repositories.py
-|   +-- features.py
-|   +-- technical.py
-|   +-- prospects.py
-|   +-- portfolio.py
-|   +-- decisions.py
-|   +-- reporting.py
-|   +-- __init__.py
-|
-+-- notebooks/
-|   +-- 01_prospect_analysis.ipynb
-|   +-- 02_portfolio_analysis.ipynb
-|   +-- 03_quantvesting_run.ipynb
-|
-+-- tests/
-+-- PHASE_A.md
-+-- PHASE_B.md
-```
-
-## Phase B capabilities
-
-### Portfolio identity
-
-Every user portfolio has a `portfolio_id`. If omitted, it is inferred from the portfolio folder name.
-
-```text
-portfolio_data/
-    ankit/
-    friend_001/
-    friend_002/
-```
-
-No investment-engine code needs to change for another portfolio.
-
-### Run identity
-
-Every analysis execution has a unique `run_id`.
-
-```text
-run_20260815_155936_f8372152
-```
-
-The same run ID can be shared by prospect and portfolio analysis in an end-to-end notebook execution.
-
-### Strategy version
-
-The strategy version comes from `config/strategy.yaml`:
-
-```yaml
-strategy:
-  version: "0.4"
-```
-
-Phase B records it with every run but does not change the current methodology.
-
-### Run manifest
-
-Each portfolio folder can contain `myRuns.csv`. It records the execution context required to understand and reproduce a result:
-
-- `run_id`
-- `portfolio_id`
-- `analysis_type`
-- `run_datetime`
-- `strategy_version`
-- `engine_version`
-- `config_hash`
-- market-data fingerprints
-- portfolio-data fingerprints
-- `eod`
-- `status`
-- `reproducibility_hash`
-
-### Data validation
-
-Before calculations, the engine validates the structural data contract:
-
-- required columns exist
-- required datasets are non-empty
-- security-level Prospects and Screener data have unique symbols
-- numeric fields are numeric
-- portfolio shares and average cost are not negative
-
-Portfolio holdings are deliberately allowed to contain multiple rows for the same symbol because DM/SV or future accounts can hold the same security.
-
-### Reproducibility
-
-A run records deterministic SHA-256 fingerprints of the relevant input DataFrames and configuration. This means a future API/UI can answer:
-
-> Which strategy, data and configuration produced this result?
-
-## EOD snapshot persistence
-
-`myPortfolioDB.csv` is the portfolio-level historical EOD result.
-
-When `eod=True`:
-
-1. the current IST calendar date is used;
-2. legacy date formats are parsed;
-3. all existing rows for that calendar date are removed;
-4. the final snapshot is inserted;
-5. the complete history is sorted chronologically;
-6. dates are written in `DD-MM-YYYY` format.
-
-This fixes the previous issue where `2026-08-15` and `15-08-2026` could be treated as different dates.
-
-## Screener ingestion
-
-When `REFRESH_SCREENER=True`:
-
-```text
-myScreenerDB.xlsx
-       |
-       v
-extract + normalise
-       |
-       v
-latest rows by Symbol
-       |
-       +---- replace matching old CSV rows
-       |
-       +---- retain older securities not in XLSX
-       v
-myScreenerDB.csv
-```
-
-The XLSX is authoritative for symbols it contains. Existing CSV duplicates are also removed during ingestion.
-
-## Notebook workflow
-
-### Prospect analysis
-
-```python
-market_data = load_market_data(MARKET_DATA_DIR)
-portfolio_data = load_portfolio_data(PORTFOLIO_DATA_DIR, portfolio_id=PORTFOLIO_ID)
-
-qv = Quantvesting(config)
-
-df_prospects = qv.prospects(
-    market_data,
-    portfolio_data=portfolio_data,
-    include_portfolio=True,
-    portfolio_id=PORTFOLIO_ID,
-    run_id=RUN_ID,
-)
-```
-
-### Portfolio analysis
-
-```python
-df_portfolio, portfolio_summary = qv.portfolio(
-    market_data,
-    portfolio_data=portfolio_data,
-    eod=EOD_RUN,
-    portfolio_id=PORTFOLIO_ID,
-    run_id=RUN_ID,
-)
-```
-
-### Reporting
-
-The engine returns structured results. Jupyter uses presentation helpers for:
-
-- interactive DataTables
-- compact portfolio summary
-- category-current donut chart
-
-The same structured objects are suitable for a future API.
-
-## Decision layer
-
-Current transparent baseline actions remain:
-
-- Portfolio: `EXIT_TARGET` when the **per-share CMP** reaches/exceeds FTT; `REVIEW_ROTATION` for CORE holdings whose thesis is substantially captured; `WAIT_FOR_EXIT_WINDOW` for LEGACY holdings; otherwise `HOLD`.
-- Prospects: top-N by `CumlRnk` are `BUY_CANDIDATE`, otherwise `WATCHLIST`. Only CORE prospects receive `CumlRnk`.
-- Capital rotation: `REVIEW_ROTATION` when a mature holding can be paired with a sufficiently attractive CORE prospect. This is advisory, not an automatic SELL.
-
-These are deliberately separated from the analytical engine so the decision methodology can evolve independently.
-
-## Roadmap
-
-```text
-PHASE A — Foundation
-[x] Screener XLSX ingestion
-[x] EOD snapshot persistence
-[x] Repository abstraction
-[x] portfolio_id / run_id awareness
-
-PHASE B — Reproducibility
-[x] Historical run tracking
-[x] Strategy version tracking
-[x] Data validation
-[x] Reproducible runs
-[x] EOD date normalization/sorting fix
-
-PHASE C — Product backend
-[ ] PostgreSQL repositories
-[ ] FastAPI
-[ ] Web UI
-
-PHASE D — Commercial product
-[ ] Authentication
-[ ] User onboarding
-[ ] Subscription
-[ ] Mobile
-```
-
-## PostgreSQL / Web readiness
-
-The current engine deliberately uses repository contracts:
-
-```text
-Jupyter / Web API / Mobile
-            |
-            v
-    Quantvesting facade
-            |
-            v
- Engine + validation + runs
-            |
-            v
-   Repository interfaces
-        /         \
-       v           v
-     CSV       PostgreSQL
-```
-
-The calculation modules should not need to know whether data came from CSV or PostgreSQL. Phase C therefore focuses on implementing new repository/API adapters rather than rewriting the investment engine.
-
-## Strategy refinement — v0.5
-
-Phase B is now refined around the actual Quantvesting portfolio philosophy. The original conviction hierarchy is preserved exactly:
-
-```text
-X-LC → H-LC → X-MC → X-SC → M-LC → H-MC → H-SC → L-LC → M-MC → M-SC → L-MC → L-SC
-```
-
-The first six buckets are the current preferred/core opportunity universe. The remaining six buckets are **LEGACY** rather than invalid: they remain visible in the portfolio and can be managed/rotated later, including during a favourable broad-market/bull phase. They do not compete for new-capital ranking through `CumlRnk`.
-
-### New prospect fields
-
-- `BusinessQuality`: X/H/M/L derived from Conviction.
-- `PortfolioClass`: `CORE` or `LEGACY`.
-- `Eligible`: whether the conviction belongs to the current six-bucket core universe.
-- `OpportunityScore`: current `Ovrl_Rank`, retained as a descriptive score (lower is better).
-- `OpportunityBand`: descriptive HIGH / ATTRACTIVE / WATCH band; it does not change ranking.
-
-The existing Value + Growth + Quality + Momentum ranking and conviction-priority ordering remain intact for CORE securities.
-
-### New portfolio fields
-
-- `ThesisCaptured%`: `(Current - AvgCost) / (FTT - AvgCost)` when a valid positive thesis range exists.
-- `RemainingUpside%`: `(FTT - Current) / Current`.
-- `RotationStatus`: `HOLD`, `ROTATION_REVIEW`, `STRONG_ROTATION_REVIEW`, `LEGACY_HOLD` or `TARGET_REACHED`.
-- `PortfolioClass` and `BusinessQuality`.
-
-`RRR Ind` remains available and unchanged. `ThesisCaptured%` is a more explicit representation of the same capital-rotation intuition.
-
-### Capital rotation
-
-`qv.capital_rotation(prospects, portfolio)` compares mature portfolio positions with the best available CORE prospect. It returns `REVIEW_ROTATION` candidates when the configured thesis-capture threshold is reached and the alternative has sufficient FTT upside. It is intentionally advisory and does **not** issue an automatic SELL instruction.
-
-Configuration is under `rotation:` in `config/strategy.yaml`; the initial 80% review threshold and 90% strong-review threshold are hypotheses to be evaluated through historical Phase-B run data, not permanent optimised constants.
-
-### Why legacy positions are retained
-
-Quantvesting does not force an immediate exit simply because a holding falls outside the preferred six conviction buckets. Those positions are explicitly classified as `LEGACY`, remain part of portfolio analysis, and can be reviewed for exit/rotation when the market provides a suitable opportunity.
-
-## Web + API beta (Phase C beta layer)
-
-The repository now contains a CSV-backed FastAPI service and responsive web UI. The web/API layer calls the same `Quantvesting` engine used by the notebooks; it does not duplicate investment calculations.
-
-### Run locally
-
-```bash
-pip install -r requirements.txt
-uvicorn quantvesting.api.app:app --app-dir src --reload
-```
-
-Open `http://127.0.0.1:8000/` for the web UI and `http://127.0.0.1:8000/docs` for the API documentation.
-
-### Deploy as a free beta on Render
-
-A `render.yaml` Blueprint is included. Connect the GitHub repository to Render and create the `quantvesting-v3` web service from the Blueprint. Render supports free Python web services, including FastAPI; free services spin down after inactivity, so the first request after idle can take about a minute. See the Render documentation for current limits. 
-
-The service URL will be:
-
-`https://quantvesting-v3-ankit.onrender.com/`
-
-if the service name is available and Render provisions that exact name. The API docs are at `/docs` and health is at `/health`.
-
-Set `QV_ACCESS_KEY` in Render for a lightweight beta gate before Phase-D authentication is implemented. Do not commit credentials or secrets.
-
-### Data layout for the beta
+### Shared/common data
 
 ```text
 market_data/
-    myScreenerDB.csv
-    myScreenerDB.xlsx
-    myProspectsScrips.csv
-    myProspects-Momentum.csv
-
-portfolio_data/
-    <portfolio_id>/
-        myPortfolioStocks.csv
-        myInvestments.csv
-        myStocks-XIRR.csv
-        myPortfolioDB.csv
-        myPortfolioAmts.json
-        myRuns.csv
+├── myProspectsScrips.csv       # Quantvesting stock universe
+├── myScreenerDB.csv
+├── myProspects-Momentum.csv
+└── myScreenerDB.xlsx
 ```
 
-For real portfolio data, keep the GitHub repository private. The web beta is intentionally pre-authentication and should only be shared with trusted beta users until Phase D authentication/user onboarding is implemented.
+`myProspectsScrips.csv` is now a true security/universe dataset. It no longer stores user-specific `InFolio`.
 
-### Web capabilities
+### User-specific data
 
-The beta UI covers the existing notebook workflow: shared Screener refresh, prospect analysis, portfolio analysis, compact portfolio summary, category donut distribution, prospect actions, portfolio actions, capital-rotation review, run IDs, validation status, and optional EOD snapshot persistence. The UI consumes API outputs generated by the existing engine and repository layer.
+```text
+portfolio_data/
+└── <portfolio_id>/
+    ├── myPortfolioStocks.csv   # required internal holding contract
+    ├── myInvestments.csv       # optional for first onboarding
+    ├── myPortfolioAmts.json    # optional
+    ├── myPortfolioDB.csv       # generated EOD history
+    ├── myStocks-XIRR.csv       # optional
+    └── myRuns.csv              # Phase-B execution metadata
+```
 
-### Future PostgreSQL migration
+The engine derives `InFolio` from the user's portfolio at runtime. Multiple account rows for the same security remain supported.
 
-The API and engine depend on repository contracts rather than CSV paths. A future `PostgresMarketDataRepository` / `PostgresPortfolioRepository` can replace the CSV repositories without changing the web UI or investment-analysis modules.
+## 5-minute onboarding
+
+A new user does **not** need to prepare all internal files.
+
+Minimum input:
+
+```csv
+Symbol,Shares,AvgCost
+TCS,100,3200
+INFY,150,1450
+HDFCBANK,200,1650
+```
+
+The onboarding layer accepts common broker/export labels such as `Ticker`, `Quantity` and `Average Price`. If no account column is supplied, it assigns `MAIN`. Duplicate symbols in a no-account upload are consolidated using a cost-weighted average.
+
+Run:
+
+```text
+notebooks/01_customer_onboarding.ipynb
+```
+
+The notebook normalizes the customer file into the existing internal portfolio contract, loads the shared Quantvesting universe/market data, and produces the existing portfolio analysis and terminal.
+
+Investment history is optional. Without it, XIRR is simply reported as unavailable rather than blocking the first assessment.
+
+## Notebook sequence
+
+| # | Notebook | Purpose |
+|---|---|---|
+| 01 | `01_customer_onboarding.ipynb` | Minimum-input onboarding → first assessment |
+| 02 | `02_prospect_analysis.ipynb` | Prospect/universe analysis |
+| 03 | `03_portfolio_analysis.ipynb` | Detailed portfolio analysis |
+| 04 | `04_quantvesting_run.ipynb` | End-to-end owner/power-user run |
+| 05 | `05_quantvesting_terminal.ipynb` | Premium executive investment terminal |
+
+See `notebooks/README.md` for the recommended customer journey. Earlier standalone notebooks remain under `notebooks/archive/`.
+
+## Existing Quantvesting methodology retained
+
+The customer-onboarding changes do **not** alter the established investment framework:
+
+- X/H/M/L quality classification
+- LC/MC/SC categorisation
+- full 12-level conviction priority map
+- first-six CORE/rankable conviction buckets
+- CumlRnk
+- FTT / NTT / LTT / BOL
+- RRR Ind
+- Risk Ind
+- portfolio allocation and concentration analysis
+- prospect analysis
+- capital rotation review
+- transparent decision layer
+- EOD snapshot persistence
+- Phase-B run IDs, portfolio IDs, strategy versions, validation and reproducibility
+
+## Phase status
+
+### Phase A — Foundation
+
+Completed.
+
+### Phase B — Traceability & reproducibility
+
+Completed:
+
+- run ID
+- portfolio ID
+- strategy version
+- run manifest
+- historical run tracking
+- validation
+- reproducibility fingerprints
+- corrected EOD upsert/date ordering
+- Screener XLSX → CSV replacement/refresh logic
+
+### Phase 1 — Customer onboarding
+
+**Current priority.**
+
+- one-file minimum onboarding
+- shared universe/user portfolio separation
+- runtime `InFolio`
+- optional investment history
+- outside-universe handling
+- onboarding validation
+- customer-first notebook sequence
+
+See `PHASE_1_CUSTOMER_ONBOARDING.md`.
+
+## Recommended product roadmap
+
+```text
+PHASE 1  Customer onboarding
+   ↓
+PHASE 2  Portfolio health & attention intelligence
+   ↓
+PHASE 3  Capital efficiency / RRR intelligence
+   ↓
+PHASE 4  Prospect & opportunity intelligence
+   ↓
+PHASE 5  Customer history / longitudinal portfolio intelligence
+   ↓
+PHASE 6  Financial health assessment
+   ↓
+PHASE 7  Premium intelligence + decision journal
+   ↓
+PHASE 8  API / PostgreSQL / polished web-mobile UI
+```
+
+Technical infrastructure should follow demonstrated customer value rather than lead it.
+
+## Tests
+
+Run from the repository root:
+
+```bash
+PYTHONPATH=src pytest -q
+```
+
+The current suite covers the existing Phase-A/B contracts plus the Phase-1 onboarding and data-separation behaviour.
